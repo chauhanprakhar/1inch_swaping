@@ -7,20 +7,22 @@ const DexesList = require("./exchanges");
 
 const provider = new Web3.providers.HttpProvider("http://127.0.0.1:8545")
 var web3 = new Web3(provider)
-var fromAddress = ""
-var fromTokenAddress = ""
+var fromAddress = "0xf60c2Ea62EDBfE808163751DD0d8693DCb30019c"
+var fromTokenAddress = "0xd850942ef8811f2a866692a623011bde52a462c1"
 var toTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 var amountToSwap = 1
 var oneSplitAddress = "0xC586BeF4a0992C495Cf22e1aeEE4E446CECDee0E";
-const ethWeiDecimals = 18
-var amountToSwapWei = new BigNumber(amountToSwap).shiftedBy(ethWeiDecimals);
 var expectedSwap = null;
-
-
+var amountToSwapWei;
+var ethWeiDecimals;
 var OneSplitContract = new web3.eth.Contract(oneSplitAbi, oneSplitAddress);
-var DaiContract = new web3.eth.Contract(erc20Abi, fromTokenAddress);
+var FromTokenContract = new web3.eth.Contract(erc20Abi, fromTokenAddress);
+
 
 async function getExpectedReturn() {
+    const decimal = await FromTokenContract.methods.decimals().call()
+    ethWeiDecimals = parseInt(decimal);
+    amountToSwapWei = new BigNumber(amountToSwap).shiftedBy(ethWeiDecimals);
     await OneSplitContract.methods
       .getExpectedReturn(
         fromTokenAddress,
@@ -64,7 +66,7 @@ async function getExpectedReturn() {
   }
   
   async function approveSpender() {
-    await DaiContract.methods
+    await FromTokenContract.methods
       .approve(oneSplitAddress, amountToSwapWei)
       .send({ from: fromAddress }, async (err, tx) => {
         if (err) console.log(`ERC20 token approving failed: ${err}`);
@@ -81,7 +83,7 @@ async function getExpectedReturn() {
   async function executeSwap() {
     // eth and dai balances before the swap
     var ethBefore = await web3.eth.getBalance(fromAddress);
-    var daiBefore = await DaiContract.methods.balanceOf(fromAddress).call();
+    var daiBefore = await FromTokenContract.methods.balanceOf(fromAddress).call();
   
     await OneSplitContract.methods
       .swap(
@@ -97,7 +99,7 @@ async function getExpectedReturn() {
         await awaitTransaction(tx);
         // eth & dai balances after the swap
         var ethAfter = await web3.eth.getBalance(fromAddress);
-        var daiAfter = await DaiContract.methods.balanceOf(fromAddress).call();
+        var daiAfter = await FromTokenContract.methods.balanceOf(fromAddress).call();
   
         console.log(`
               The swap went successfull.
